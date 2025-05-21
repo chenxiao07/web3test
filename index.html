@@ -10,25 +10,9 @@
         button { padding: 10px 15px; margin: 10px 5px; background-color: #f0b90b; color: black; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
         button:hover { background-color: #e0ac0a; }
         button:disabled { background-color: #cccccc; cursor: not-allowed; }
-        #walletAddress, #zkjBalance, #b2Balance { margin-top: 10px; padding: 8px; background-color: #e9ecef; border-radius: 4px; word-wrap: break-word; }
-        #status { margin-top: 10px; padding: 8px; background-color: #e9ecef; border-radius: 4px; font-weight: bold; }
-        #logArea {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #333;
-            color: #f0f0f0;
-            border-radius: 4px;
-            height: 200px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.9em;
-            white-space: pre-wrap; /* Preserve whitespace and wrap lines */
-            word-break: break-all; /* Break long words/URLs */
-        }
-        .log-error { color: #ff6b6b; }
-        .log-success { color: #6bff95; }
-        .log-info { color: #63e6be; }
-        .log-warn { color: #ffc078; }
+        #walletAddress, #zkjBalance, #b2Balance, #status { margin-top: 10px; padding: 8px; background-color: #e9ecef; border-radius: 4px; word-wrap: break-word; }
+        .error { color: red; font-weight: bold; }
+        .success { color: green; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -50,14 +34,10 @@
         <button id="swapAllB2toZKJBBtn" disabled>B: 全部 B2 兑换 ZKJ</button>
 
         <hr>
-        <p>当前状态: <span id="status">等待操作...</span></p>
-        <div id="logAreaContainer">
-            <h3>详细日志:</h3>
-            <div id="logArea"></div>
-        </div>
+        <p>状态: <span id="status">等待操作...</span></p>
     </div>
 
-    <script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js"></script>
-    <script src="app.js?r=111"></script>
+    <script src="https://unpkg.com/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

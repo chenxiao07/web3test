@@ -34,35 +34,6 @@ const refreshBalancesBtn = document.getElementById('refreshBalancesBtn');
 const swapAllZKJtoB2Btn = document.getElementById('swapAllZKJtoB2Btn');
 const swapAllB2toZKJBBtn = document.getElementById('swapAllB2toZKJBBtn');
 const statusEl = document.getElementById('status');
-const logAreaEl = document.getElementById('logArea'); // 新增
-
-
-// --- 日志函数 ---
-function logMessage(message, type = 'info') { // type can be 'info', 'error', 'success', 'warn'
-    const timestamp = new Date().toLocaleTimeString();
-    const logEntry = document.createElement('div');
-    logEntry.classList.add(`log-${type}`);
-    logEntry.innerHTML = `[${timestamp}] ${message.replace(/\n/g, '<br>')}`; // Replace newlines with <br> for HTML
-    
-    // Prepend to keep newest on top, or append for chronological
-    logAreaEl.prepend(logEntry); // 新消息在顶部
-    // logAreaEl.appendChild(logEntry); // 新消息在底部 (如果需要滚动到底部，还需额外JS)
-    // logAreaEl.scrollTop = 0; // 如果prepend，滚动到顶部
-
-    // 同时更新简短状态
-    if (type === 'error') {
-        statusEl.textContent = `错误: ${message.split('\n')[0]}`; // 显示错误的第一行作为简短状态
-        statusEl.className = 'error';
-    } else if (type === 'success') {
-        statusEl.textContent = `成功: ${message.split('\n')[0]}`;
-        statusEl.className = 'success';
-    } else {
-        statusEl.textContent = message.split('\n')[0];
-        statusEl.className = '';
-    }
-    console[type === 'error' ? 'error' : 'log'](message); // 也在控制台输出
-}
-
 
 // --- 初始化 ---
 async function init() {

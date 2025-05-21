@@ -63,35 +63,37 @@ function logMessage(message, type = 'info') { // type can be 'info', 'error', 's
 }
 
 
-// --- 初始化 ---
-async function init() {
-    connectWalletBtn.addEventListener('click', connectWallet);
-    refreshBalancesBtn.addEventListener('click', updateBalances);
-    swapAllZKJtoB2Btn.addEventListener('click', () => handleFullSwap(ZKJ_TOKEN_ADDRESS, B2_TOKEN_ADDRESS, 'ZKJ'));
-    swapAllB2toZKJBBtn.addEventListener('click', () => handleFullSwap(B2_TOKEN_ADDRESS, ZKJ_TOKEN_ADDRESS, 'B2'));
-
+// --- 初始化 (修改后的) ---
+async function initializeDApp() {
     if (typeof window.ethereum !== 'undefined') {
         provider = new ethers.providers.Web3Provider(window.ethereum);
         logMessage("钱包提供者 (window.ethereum) 已找到。", "info");
+
         window.ethereum.on('accountsChanged', handleAccountsChanged);
         window.ethereum.on('chainChanged', (_chainId) => {
             logMessage(`网络已更改 (chainId: ${_chainId})。正在重新加载页面...`, "warn");
             window.location.reload();
         });
         
-        const accounts = await provider.listAccounts();
-        if (accounts.length > 0) {
-            logMessage("检测到已连接的账户，尝试自动连接...", "info");
-            handleAccountsChanged(accounts);
-        } else {
-            logMessage("请点击 '连接钱包' 按钮。", "info");
+        try {
+            const accounts = await provider.listAccounts();
+            if (accounts.length > 0) {
+                logMessage("检测到已连接的账户，尝试自动连接...", "info");
+                handleAccountsChanged(accounts);
+            } else {
+                logMessage("请点击 '连接钱包' 按钮。如果已安装钱包但未显示，请尝试刷新页面。", "info");
+            }
+        } catch (error) {
+            logMessage(`列出账户时出错 (可能钱包尚未完全准备好): ${error.message}`, "warn");
+            logMessage("请尝试刷新页面或稍后点击 '连接钱包'。", "info");
         }
 
     } else {
-        logMessage('请安装或使用支持EIP-1193的钱包 (如MetaMask, Binance Web3 Wallet等)', 'error');
-        connectWalletBtn.disabled = true;
+        logMessage('EIP-1193钱包提供者 (window.ethereum) 未找到。请确保您的钱包已启用并已注入到此页面。', 'error');
+        connectWalletBtn.disabled = true; // 禁用连接按钮，因为没有提供者
     }
 }
+
 
 function handleAccountsChanged(accounts) {
     if (accounts.length > 0) {
@@ -361,5 +363,30 @@ function enableButtons() { /* ... */ }
 function disableButtons() { /* ... */ }
 function clearBalances() { /* ... */ }
 
-// --- 启动DApp ---
-window.addEventListener('load', init);
+
+
+// 启动DApp的入口点
+function startApp(retryCount = 0) {
+    if (typeof window.ethereum !== 'undefined') {
+        logMessage("window.ethereum 已检测到。", "info");
+        initializeDApp();
+    } else if (retryCount < MAX_RETRIES) {
+        logMessage(`window.ethereum 未找到。正在尝试 (${retryCount + 1}/${MAX_RETRIES})...`, "warn");
+        setTimeout(() => startApp(retryCount + 1), RETRY_INTERVAL);
+    } else {
+        logMessage(`在 ${MAX_RETRIES} 次尝试后，window.ethereum 仍未找到。请确保您的钱包已正确安装和启用，并尝试刷新页面。`, "error");
+        // 可以在这里禁用所有交互按钮，因为没有钱包提供者
+        connectWalletBtn.textContent = "钱包未找到";
+        connectWalletBtn.disabled = true;
+        disableButtons(); // 确保其他操作按钮也禁用
+    }
+}
+
+
+window.addEventListener('load', () => {
+    logMessage("页面已加载。开始检测钱包...", "info");
+    startApp();
+});
+
+
+

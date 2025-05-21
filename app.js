@@ -36,7 +36,6 @@ const swapAllB2toZKJBBtn = document.getElementById('swapAllB2toZKJBBtn');
 const statusEl = document.getElementById('status');
 const logAreaEl = document.getElementById('logArea'); // 新增
 
-
 // --- 日志函数 ---
 function logMessage(message, type = 'info') { // type can be 'info', 'error', 'success', 'warn'
     const timestamp = new Date().toLocaleTimeString();
@@ -73,18 +72,23 @@ async function init() {
 
     if (typeof window.ethereum !== 'undefined') {
         provider = new ethers.providers.Web3Provider(window.ethereum);
-        // 监听账户和网络变化
+        logMessage("钱包提供者 (window.ethereum) 已找到。", "info");
         window.ethereum.on('accountsChanged', handleAccountsChanged);
-        window.ethereum.on('chainChanged', (_chainId) => window.location.reload());
+        window.ethereum.on('chainChanged', (_chainId) => {
+            logMessage(`网络已更改 (chainId: ${_chainId})。正在重新加载页面...`, "warn");
+            window.location.reload();
+        });
         
-        // 尝试自动连接如果之前已授权
         const accounts = await provider.listAccounts();
         if (accounts.length > 0) {
+            logMessage("检测到已连接的账户，尝试自动连接...", "info");
             handleAccountsChanged(accounts);
+        } else {
+            logMessage("请点击 '连接钱包' 按钮。", "info");
         }
 
     } else {
-        statusEl.textContent = '请安装或使用支持EIP-1193的钱包 (如MetaMask, Binance Web3 Wallet等)';
+        logMessage('请安装或使用支持EIP-1193的钱包 (如MetaMask, Binance Web3 Wallet等)', 'error');
         connectWalletBtn.disabled = true;
     }
 }
@@ -94,6 +98,7 @@ function handleAccountsChanged(accounts) {
         userAddress = accounts[0];
         walletAddressEl.textContent = userAddress;
         signer = provider.getSigner();
+        logMessage(`钱包已连接。地址: ${userAddress}`, "success");
         checkNetworkAndInitialize();
     } else {
         userAddress = null;
@@ -101,63 +106,82 @@ function handleAccountsChanged(accounts) {
         signer = null;
         disableButtons();
         clearBalances();
-        statusEl.textContent = "钱包已断开连接";
+        logMessage("钱包已断开连接。", "warn");
     }
 }
 
 async function checkNetworkAndInitialize() {
-    const network = await provider.getNetwork();
-    if (network.chainId !== CHAIN_ID) {
-        statusEl.innerHTML = `请将钱包网络切换到 ${IS_TESTNET ? 'BSC Testnet' : 'BSC Mainnet'} (Chain ID: ${CHAIN_ID}). 
-                              当前网络: ${network.name} (ID: ${network.chainId})`;
-        try {
-             await window.ethereum.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: ethers.utils.hexValue(CHAIN_ID) }],
-            });
-            // 切换成功后，chainChanged事件会触发页面重载，或者可以手动调用初始化
-            initializeContracts();
-            enableButtons();
-            updateBalances();
-        } catch (switchError) {
-            console.error("切换网络失败", switchError);
-            if (switchError.code === 4902) { // Chain not added
-                 statusEl.innerHTML += `<br>请先将网络添加到您的钱包中。`;
-                 // 此处可以添加添加网络的逻辑，但为了简化，我们提示用户手动添加
+    try {
+        const network = await provider.getNetwork();
+        logMessage(`当前网络: ${network.name} (ID: ${network.chainId})`, "info");
+
+        if (network.chainId !== CHAIN_ID) {
+            const targetNetworkName = IS_TESTNET ? 'BSC Testnet' : 'BSC Mainnet';
+            logMessage(`网络不匹配！请将钱包网络切换到 ${targetNetworkName} (Chain ID: ${CHAIN_ID}).`, "warn");
+            
+            try {
+                logMessage(`尝试自动切换到 Chain ID: ${CHAIN_ID}...`, "info");
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: ethers.utils.hexValue(CHAIN_ID) }],
+                });
+                // 切换成功后，chainChanged事件通常会触发页面重载或回调
+                // 如果没有自动重载，可能需要手动调用初始化
+                // logMessage("网络切换请求已发送。等待钱包响应...", "info");
+                // 等待 chainChanged 事件
+            } catch (switchError) {
+                logMessage(`自动切换网络失败: ${switchError.message} (Code: ${switchError.code})`, "error");
+                if (switchError.code === 4902) {
+                    logMessage(`目标网络 (Chain ID: ${CHAIN_ID}) 未添加到您的钱包。请手动添加。`, "error");
+                     // 可以在这里提供添加网络的参数，但用户体验可能更好的是让他们手动操作
+                }
+                disableButtons();
+                return; // 阻止后续初始化
             }
-            disableButtons();
-            return;
         }
+        // 即使网络正确，或者切换成功后，也重新初始化
+        initializeContracts();
+        enableButtons();
+        updateBalances();
+
+    } catch (error) {
+        logMessage(`检查网络时发生错误: ${error.message}`, "error");
     }
-    initializeContracts();
-    enableButtons();
-    updateBalances();
-    statusEl.textContent = '钱包已连接!';
 }
 
 
 async function connectWallet() {
-    if (!provider) return alert('钱包提供者未找到!');
+    if (!provider) return logMessage('钱包提供者未找到!', 'error');
+    logMessage("正在请求连接钱包...", "info");
     try {
         const accounts = await provider.send("eth_requestAccounts", []);
-        handleAccountsChanged(accounts);
+        // handleAccountsChanged会处理后续逻辑
     } catch (error) {
-        console.error("连接钱包失败:", error);
-        statusEl.textContent = `连接钱包失败: ${error.message || error}`;
+        logMessage(`连接钱包失败: ${error.message || JSON.stringify(error)}`, "error");
     }
 }
 
 function initializeContracts() {
-    if (!signer) return;
-    zkjContract = new ethers.Contract(ZKJ_TOKEN_ADDRESS, ERC20_ABI, signer);
-    b2Contract = new ethers.Contract(B2_TOKEN_ADDRESS, ERC20_ABI, signer);
-    console.log("合约已初始化");
+    if (!signer) {
+        logMessage("Signer未找到，无法初始化合约。", "error");
+        return;
+    }
+    try {
+        zkjContract = new ethers.Contract(ZKJ_TOKEN_ADDRESS, ERC20_ABI, signer);
+        b2Contract = new ethers.Contract(B2_TOKEN_ADDRESS, ERC20_ABI, signer);
+        logMessage("ZKJ和B2合约已成功初始化。", "success");
+    } catch (error) {
+        logMessage(`合约初始化失败: ${error.message}`, "error");
+    }
 }
 
 async function updateBalances() {
-    if (!userAddress || !zkjContract || !b2Contract) return;
+    if (!userAddress || !zkjContract || !b2Contract) {
+        logMessage("无法更新余额：未连接钱包或合约未初始化。", "warn");
+        return;
+    }
+    logMessage("正在获取余额...", "info");
     try {
-        statusEl.textContent = "正在获取余额...";
         const zkjDecimals = await zkjContract.decimals();
         const b2Decimals = await b2Contract.decimals();
 
@@ -166,26 +190,10 @@ async function updateBalances() {
 
         zkjBalanceEl.textContent = ethers.utils.formatUnits(zkjBal, zkjDecimals);
         b2BalanceEl.textContent = ethers.utils.formatUnits(b2Bal, b2Decimals);
-        statusEl.textContent = "余额已更新";
+        logMessage(`余额已更新: ZKJ=${zkjBalanceEl.textContent}, B2=${b2BalanceEl.textContent}`, "success");
     } catch (error) {
-        console.error("更新余额失败:", error);
-        statusEl.textContent = `更新余额失败: ${error.message}`;
+        logMessage(`更新余额失败: ${error.message}`, "error");
     }
-}
-
-function enableButtons() {
-    refreshBalancesBtn.disabled = false;
-    swapAllZKJtoB2Btn.disabled = false;
-    swapAllB2toZKJBBtn.disabled = false;
-}
-function disableButtons() {
-    refreshBalancesBtn.disabled = true;
-    swapAllZKJtoB2Btn.disabled = true;
-    swapAllB2toZKJBBtn.disabled = true;
-}
-function clearBalances() {
-    zkjBalanceEl.textContent = "0";
-    b2BalanceEl.textContent = "0";
 }
 
 // --- 1inch API 辅助函数 (增强错误捕获) ---
@@ -226,6 +234,7 @@ async function fetch1inch(endpoint, params = {}) {
         throw error; // 重新抛出，让调用者处理
     }
 }
+
 
 // --- 核心兑换逻辑 (使用 logMessage) ---
 async function handleFullSwap(tokenInAddress, tokenOutAddress, tokenInSymbol) {
@@ -346,6 +355,11 @@ async function handleFullSwap(tokenInAddress, tokenOutAddress, tokenInSymbol) {
         console.error("详细错误对象:", error);
     }
 }
+
+// --- 启用/禁用按钮 (保持不变) ---
+function enableButtons() { /* ... */ }
+function disableButtons() { /* ... */ }
+function clearBalances() { /* ... */ }
 
 // --- 启动DApp ---
 window.addEventListener('load', init);
